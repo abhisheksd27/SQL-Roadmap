@@ -299,4 +299,100 @@ $('#import').onclick=()=>$('#import-file').click();$('#import-file').onchange=as
 window.addEventListener('hashchange',()=>{if($('#question-dialog').open)$('#question-dialog').close();render();});
 window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{if($('#question-dialog').open){toast('Progress changed in another tab. Close this question to refresh.');return;}state=validateState(JSON.parse(e.newValue));render();}catch{}}});
 render();if(!storageOK){$('.save-status').textContent='○ Storage unavailable — export backup';toast('Saved progress could not be loaded. Export backups to protect new work.');}
-</script></body></html>
+<script>
+(() => {
+  const previousOpenQuestion = openQuestion;
+
+  openQuestion = function (id, inline = false) {
+    const question = QUESTIONS.find(item => item.id === id);
+    if (!question) return;
+
+    // Preserve the full-page notes view in the newer version.
+    if (inline) {
+      return previousOpenQuestion(id, true);
+    }
+
+    // Open external problems directly in the current tab.
+    if (question.url) {
+      window.location.href = question.url;
+      return;
+    }
+
+    // Show original exercises directly on the page.
+    const topic = TOPICS.find(item => item.id === question.topic);
+    const saved = qState(id);
+    const main = document.querySelector("#main");
+
+    main.innerHTML = `
+      <section class="lesson">
+        <button id="back-to-questions">← Back to questions</button>
+
+        <p class="section-kicker">
+          ${esc(topic.title)} · Original exercise
+        </p>
+
+        <h1>${esc(question.title)}</h1>
+        <p class="dialog-prompt">${esc(question.prompt)}</p>
+
+        <details>
+          <summary>View practice schema</summary>
+          <pre>${esc(SCHEMA)}</pre>
+        </details>
+
+        <details>
+          <summary>Review this topic</summary>
+          <p>${esc(topic.explanation)}</p>
+          <pre>${esc(topic.example)}</pre>
+          <p>${esc(topic.walkthrough)}</p>
+        </details>
+
+        <label for="exercise-status">Progress</label>
+        <select id="exercise-status">
+          ${["Not started", "In progress", "Solved"].map(status => `
+            <option ${saved.status === status ? "selected" : ""}>
+              ${status}
+            </option>
+          `).join("")}
+        </select>
+
+        <label class="note-label" for="exercise-notes">
+          Your notes and SQL solution — saved automatically
+        </label>
+
+        <textarea
+          id="exercise-notes"
+          spellcheck="false"
+          placeholder="Write your SQL solution here..."
+        >${esc(saved.notes)}</textarea>
+
+        <p class="fine">
+          Practice in your SQL environment.
+          This page saves your work but does not execute SQL.
+        </p>
+      </section>
+    `;
+
+    document.querySelector("#back-to-questions").onclick = () => {
+      render();
+    };
+
+    document.querySelector("#exercise-status").onchange = event => {
+      const status = event.target.value;
+      const current = qState(id);
+
+      updateQuestion(id, {
+        status,
+        solvedAt: status === "Solved"
+          ? current.solvedAt || localDate()
+          : null
+      });
+    };
+
+    document.querySelector("#exercise-notes").oninput = event => {
+      updateQuestion(id, { notes: event.target.value });
+    };
+
+    window.scrollTo(0, 0);
+  };
+})();
+</script></script></body></html>
